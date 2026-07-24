@@ -35,31 +35,41 @@ export default function BatchesPage() {
   const { phase, matches } = usePhase();
 
   const [batches, setBatches] = useState([]); // authoritative list from get-batches
+  const [cohorts, setCohorts] = useState([]); // custom cohorts (e.g. AIRE Batch - III Year)
   const [directory, setDirectory] = useState([]);
   const [daily, setDaily] = useState([]);
   const [grand, setGrand] = useState([]);
   const [attByBatch, setAttByBatch] = useState({}); // batchName -> raw attendance result
+  const [cohortAtt, setCohortAtt] = useState({}); // cohort slug -> raw attendance result
   const [loaded, setLoaded] = useState(false);
   const [attLoaded, setAttLoaded] = useState(false);
 
   useEffect(() => {
     let cancel = false;
     (async () => {
-      const [b, dir, d, g] = await Promise.all([
+      const [b, dir, d, g, cbs] = await Promise.all([
         apiGet("/batches").then((r) => r.batches || []).catch(() => []),
         apiGet("/students").then((r) => r.students || []).catch(() => []),
         apiGet("/assessments?type=daily").then((r) => r.assessments || []).catch(() => []),
         apiGet("/assessments?type=grand").then((r) => r.assessments || []).catch(() => []),
+        apiGet("/custom-batches").then((r) => r.batches || []).catch(() => []),
       ]);
       if (cancel) return;
-      setBatches(b); setDirectory(dir); setDaily(d); setGrand(g); setLoaded(true);
-      // per-batch attendance (parallel)
+      setBatches(b); setDirectory(dir); setDaily(d); setGrand(g); setCohorts(cbs); setLoaded(true);
+      // per-batch + per-cohort attendance (parallel)
       const map = {};
-      await Promise.all(b.map(async (x) => {
-        try { const r = await apiPost("/attendance", { batch_id: x.id }); map[x.name] = r.result || []; }
-        catch { map[x.name] = []; }
-      }));
-      if (!cancel) { setAttByBatch(map); setAttLoaded(true); }
+      const cmap = {};
+      await Promise.all([
+        ...b.map(async (x) => {
+          try { const r = await apiPost("/attendance", { batch_id: x.id }); map[x.name] = r.result || []; }
+          catch { map[x.name] = []; }
+        }),
+        ...cbs.map(async (c) => {
+          try { const r = await apiPost("/attendance", { rolls: c.rolls || [] }); cmap[c.slug] = r.result || []; }
+          catch { cmap[c.slug] = []; }
+        }),
+      ]);
+      if (!cancel) { setAttByBatch(map); setCohortAtt(cmap); setAttLoaded(true); }
     })();
     return () => { cancel = true; };
   }, []);
@@ -98,6 +108,24 @@ export default function BatchesPage() {
       .filter((c) => all || c.count > 0 || c.depts.length > 0) // HOD: only batches with their students
       .sort((a, c) => c.count - a.count);
   }, [batches, directory, all, user, attByBatch, dirMap, daily, grand, activeOnly, isActive, phase, matches]);
+
+  // Custom cohorts (members span the real batches) — shown as their own cards.
+  const cohortCards = useMemo(() => {
+    if (!user) return [];
+    return cohorts.map((c) => {
+      const members = (c.students || [])
+        .filter((s) => all || sameDept(s.branch, user.department))
+        .filter((s) => !activeOnly || isActive(s.torii));
+      const dm = new Map();
+      for (const s of members) dm.set(s.branch || "—", (dm.get(s.branch || "—") || 0) + 1);
+      const depts = [...dm.entries()].sort((a, b) => b[1] - a[1]);
+      let attRows = scopeAttendance(user, enrichAttendance(cohortAtt[c.slug] || [], dirMap));
+      if (activeOnly) attRows = attRows.filter((r) => isActive(r.torii));
+      if (phase !== "all") attRows = applyPhase(attRows, matches).filter((r) => r.total > 0);
+      const ov = attendanceOverview(attRows);
+      return { id: c.slug, name: c.name, count: members.length, depts, ov, hasAtt: (cohortAtt[c.slug] || []).length > 0 };
+    }).filter((c) => all || c.count > 0);
+  }, [cohorts, cohortAtt, dirMap, all, user, activeOnly, isActive, phase, matches]);
 
   const summary = useMemo(() => {
     let present = 0, total = 0;
@@ -193,6 +221,44 @@ export default function BatchesPage() {
               </Link>
             ))}
           </div>
+
+          {cohortCards.length > 0 && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-foreground">Custom cohorts</h3>
+                <p className="text-sm text-muted">Named student groups spanning the placement batches.</p>
+              </div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {cohortCards.map((c) => (
+                  <Link key={c.id} href="/attendance">
+                    <Card interactive className="flex h-full flex-col overflow-hidden">
+                      <div className="flex items-center justify-between bg-gradient-to-r from-brand/10 to-transparent px-5 py-4">
+                        <div className="min-w-0">
+                          <h3 className="truncate font-semibold text-foreground">{c.name}</h3>
+                          <p className="truncate text-xs text-muted">Custom cohort</p>
+                        </div>
+                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand/15 text-brand">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M12 2 9.2 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.2-.7L12 2Z" /></svg>
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 divide-x divide-border border-y border-border">
+                        <MiniStat label="Students" value={c.count} />
+                        <MiniStat label="Attendance" value={attLoaded ? (c.hasAtt ? `${c.ov.overallPercent}%` : "—") : "…"} tone={attLoaded && c.hasAtt ? attTone(c.ov.overallPercent) : undefined} />
+                      </div>
+                      <div className="flex flex-1 flex-col px-5 pb-5 pt-3">
+                        <p className="text-xs text-muted">{c.depts.length} department{c.depts.length === 1 ? "" : "s"}</p>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {c.depts.slice(0, 4).map(([d, n]) => <Badge key={d} tone="neutral">{d} · {n}</Badge>)}
+                          {c.depts.length > 4 && <Badge tone="outline">+{c.depts.length - 4}</Badge>}
+                        </div>
+                        <p className="mt-auto pt-4 text-sm font-medium text-brand">Open attendance →</p>
+                      </div>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

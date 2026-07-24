@@ -46,6 +46,7 @@ export default function AttendancePage() {
   const { phase, matches } = usePhase();
 
   const [batches, setBatches] = useState([]);
+  const [cohorts, setCohorts] = useState([]); // custom cohorts (e.g. AIRE Batch - III Year)
   const [directory, setDirectory] = useState([]);
   const [roster, setRoster] = useState([]);
   const [batchId, setBatchId] = useState("");
@@ -62,17 +63,18 @@ export default function AttendancePage() {
   // Load batch list + student directory once.
   useEffect(() => {
     apiGet("/attendance/batches").then((d) => setBatches(d.batches || [])).catch(() => setBatches([]));
+    apiGet("/custom-batches").then((d) => setCohorts(d.batches || [])).catch(() => setCohorts([]));
     apiGet("/students").then((d) => setDirectory(d.students || [])).catch(() => setDirectory([]));
     apiGet("/roster").then((d) => setRoster(d.roster || [])).catch(() => setRoster([]));
   }, []);
 
-  const loadAttendance = useCallback(async (id) => {
+  const loadAttendance = useCallback(async (id, rolls) => {
     if (!id) return;
     setLoading(true);
     setError("");
     setRaw(null);
     try {
-      const d = await apiPost("/attendance", { batch_id: id });
+      const d = await apiPost("/attendance", rolls ? { rolls } : { batch_id: id });
       const res = d.result || [];
       setRaw(res);
       // Default to the latest day that actually has attendance marked (a present
@@ -103,7 +105,12 @@ export default function AttendancePage() {
     setDeptF("all");
     setDateF("all");
     setQuery("");
-    loadAttendance(id);
+    if (id.startsWith("cohort:")) {
+      const c = cohorts.find((x) => `cohort:${x.slug}` === id);
+      loadAttendance(id, c?.rolls || []);
+    } else {
+      loadAttendance(id);
+    }
   };
 
   // Torii → { usn, name, department }. Departments come from the roster
@@ -197,7 +204,9 @@ export default function AttendancePage() {
 
   if (!user) return null;
 
-  const batchName = batches.find((b) => b.id === batchId)?.name || "";
+  const batchName = batchId.startsWith("cohort:")
+    ? cohorts.find((c) => `cohort:${c.slug}` === batchId)?.name || ""
+    : batches.find((b) => b.id === batchId)?.name || "";
 
   const onDownload = async () => {
     setDownloading(true);
@@ -286,6 +295,13 @@ export default function AttendancePage() {
           {batches.map((b) => (
             <option key={b.id} value={b.id}>{b.name} ({b.studentCount})</option>
           ))}
+          {cohorts.length > 0 && (
+            <optgroup label="Custom cohorts">
+              {cohorts.map((c) => (
+                <option key={c.slug} value={`cohort:${c.slug}`}>{c.name} ({c.studentCount})</option>
+              ))}
+            </optgroup>
+          )}
         </select>
         {raw && (
           <>

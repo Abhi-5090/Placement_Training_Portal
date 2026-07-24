@@ -48,6 +48,7 @@ export default function PremiumAnalyticsPage() {
   const { phase, matches } = usePhase();
 
   const [rows, setRows] = useState(null); // enriched attendance across all batches
+  const [cohorts, setCohorts] = useState([]); // custom cohorts (e.g. AIRE Batch - III Year)
   const [loading, setLoading] = useState(true);
 
   const [batchF, setBatchF] = useState("all");
@@ -60,12 +61,14 @@ export default function PremiumAnalyticsPage() {
     let cancel = false;
     (async () => {
       try {
-        const [dir, ros, batches] = await Promise.all([
+        const [dir, ros, batches, cbs] = await Promise.all([
           apiGet("/students").then((r) => r.students || []).catch(() => []),
           apiGet("/roster").then((r) => r.roster || []).catch(() => []),
           apiGet("/batches").then((r) => r.batches || []).catch(() => []),
+          apiGet("/custom-batches").then((r) => r.batches || []).catch(() => []),
         ]);
         if (cancel) return;
+        setCohorts(cbs);
         const dm = directoryMap(dir);
         for (const r of ros) if (r.torii) dm.set((r.torii || "").trim().toUpperCase(), r);
         const all = [];
@@ -100,12 +103,19 @@ export default function PremiumAnalyticsPage() {
   const batchOptions = useMemo(() => [...new Set(scoped.map((r) => r.batchName).filter(Boolean))].sort(), [scoped]);
   const deptOptions = useMemo(() => [...new Set(scoped.map((r) => r.department).filter(Boolean))].sort(), [scoped]);
 
+  // A cohort filters by its Torii set (its members span the real batches).
+  const cohortRolls = useMemo(() => {
+    if (!batchF.startsWith("cohort:")) return null;
+    const c = cohorts.find((x) => `cohort:${x.slug}` === batchF);
+    return c ? new Set((c.rolls || []).map((t) => (t || "").toUpperCase())) : new Set();
+  }, [batchF, cohorts]);
+
   const filtered = useMemo(
     () =>
       scoped
-        .filter((r) => (batchF === "all" ? true : r.batchName === batchF))
+        .filter((r) => (batchF === "all" ? true : cohortRolls ? cohortRolls.has((r.torii || "").toUpperCase()) : r.batchName === batchF))
         .filter((r) => (deptF === "all" ? true : r.department === deptF)),
-    [scoped, batchF, deptF],
+    [scoped, batchF, deptF, cohortRolls],
   );
 
   // Only students with recorded sessions are placed in a band.
@@ -135,7 +145,12 @@ export default function PremiumAnalyticsPage() {
   }, [tracked]);
 
   const selectedBucket = useMemo(() => grouped.find((g) => g.key === selected) || null, [grouped, selected]);
-  const scopeLabel = `${batchF === "all" ? "All batches" : batchF} · ${deptF === "all" ? "All departments" : deptF}`;
+  const batchFLabel = batchF === "all"
+    ? "All batches"
+    : batchF.startsWith("cohort:")
+      ? cohorts.find((c) => `cohort:${c.slug}` === batchF)?.name || "Cohort"
+      : batchF;
+  const scopeLabel = `${batchFLabel} · ${deptF === "all" ? "All departments" : deptF}`;
 
   if (!user) return null;
 
@@ -171,6 +186,11 @@ export default function PremiumAnalyticsPage() {
         <select className={FIELD} value={batchF} onChange={(e) => { setBatchF(e.target.value); setSelected(null); }}>
           <option value="all">All batches</option>
           {batchOptions.map((b) => <option key={b} value={b}>{b}</option>)}
+          {cohorts.length > 0 && (
+            <optgroup label="Custom cohorts">
+              {cohorts.map((c) => <option key={c.slug} value={`cohort:${c.slug}`}>{c.name}</option>)}
+            </optgroup>
+          )}
         </select>
         {all && (
           <select className={FIELD} value={deptF} onChange={(e) => { setDeptF(e.target.value); setSelected(null); }}>
