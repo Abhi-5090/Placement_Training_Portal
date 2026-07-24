@@ -4,11 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useStudentStatus } from "@/components/students/StudentStatusProvider";
+import { usePhase } from "@/components/layout/PhaseProvider";
+import { PhaseSelect } from "@/components/layout/PhaseSelect";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { StatCard } from "@/components/dashboard/charts";
 import { apiGet, apiPost } from "@/lib/apiClient";
-import { directoryMap, enrichAttendance, scopeAttendance, attendanceOverview } from "@/lib/attendanceData";
+import { directoryMap, enrichAttendance, scopeAttendance, applyPhase, attendanceOverview } from "@/lib/attendanceData";
 import { seesAllStudents, roleLabel, sameDept } from "@/lib/roles";
 import { cn } from "@/lib/utils";
 
@@ -30,6 +32,7 @@ function attTone(p) {
 export default function BatchesPage() {
   const { user } = useAuth();
   const { isActive, activeOnly, setActiveOnly } = useStudentStatus();
+  const { phase, matches } = usePhase();
 
   const [batches, setBatches] = useState([]); // authoritative list from get-batches
   const [directory, setDirectory] = useState([]);
@@ -83,6 +86,7 @@ export default function BatchesPage() {
           : dirStudents.length;
         let attRows = scopeAttendance(user, enrichAttendance(attByBatch[b.name] || [], dirMap));
         if (activeOnly) attRows = attRows.filter((r) => isActive(r.torii));
+        if (phase !== "all") attRows = applyPhase(attRows, matches).filter((r) => r.total > 0);
         const ov = attendanceOverview(attRows);
         const dailyCount = daily.filter((a) => a.batchList?.includes(b.name)).length;
         const grandCount = grand.filter((a) => a.batchList?.includes(b.name)).length;
@@ -93,7 +97,7 @@ export default function BatchesPage() {
       })
       .filter((c) => all || c.count > 0 || c.depts.length > 0) // HOD: only batches with their students
       .sort((a, c) => c.count - a.count);
-  }, [batches, directory, all, user, attByBatch, dirMap, daily, grand, activeOnly, isActive]);
+  }, [batches, directory, all, user, attByBatch, dirMap, daily, grand, activeOnly, isActive, phase, matches]);
 
   const summary = useMemo(() => {
     let present = 0, total = 0;
@@ -115,7 +119,8 @@ export default function BatchesPage() {
             {activeOnly ? " Showing continuing students only." : ""}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <PhaseSelect />
           <div className="flex items-center rounded-full border border-border p-0.5 text-xs">
             <button
               type="button"

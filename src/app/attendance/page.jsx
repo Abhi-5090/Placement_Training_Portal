@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useStudentStatus } from "@/components/students/StudentStatusProvider";
+import { usePhase } from "@/components/layout/PhaseProvider";
+import { PhaseSelect } from "@/components/layout/PhaseSelect";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -12,6 +14,7 @@ import {
   directoryMap,
   enrichAttendance,
   scopeAttendance,
+  applyPhase,
   attendanceOverview,
   byDate,
   byMode,
@@ -40,6 +43,7 @@ function pctTone(p) {
 export default function AttendancePage() {
   const { user } = useAuth();
   const { isActive, activeOnly, setActiveOnly } = useStudentStatus();
+  const { phase, matches } = usePhase();
 
   const [batches, setBatches] = useState([]);
   const [directory, setDirectory] = useState([]);
@@ -112,9 +116,14 @@ export default function AttendancePage() {
   }, [directory, roster]);
   const scoped = useMemo(() => {
     if (!raw) return [];
-    const rows = scopeAttendance(user, enrichAttendance(raw, dirMap));
-    return activeOnly ? rows.filter((r) => isActive(r.torii)) : rows;
-  }, [raw, dirMap, user, activeOnly, isActive]);
+    let rows = scopeAttendance(user, enrichAttendance(raw, dirMap));
+    if (activeOnly) rows = rows.filter((r) => isActive(r.torii));
+    if (phase !== "all") rows = applyPhase(rows, matches).filter((r) => r.total > 0);
+    return rows;
+  }, [raw, dirMap, user, activeOnly, isActive, phase, matches]);
+
+  // A selected date can fall outside the chosen phase — reset it when phase changes.
+  useEffect(() => { setDateF("all"); }, [phase]);
   // Inactive students hidden by the active-only filter (for the notice).
   const hiddenInactive = useMemo(() => {
     if (!raw || !activeOnly) return 0;
@@ -271,6 +280,7 @@ export default function AttendancePage() {
 
       {/* Controls */}
       <Card className="flex flex-wrap items-center gap-3 p-4">
+        <PhaseSelect />
         <select className={FIELD} value={batchId} onChange={(e) => onBatch(e.target.value)}>
           <option value="">Select a batch…</option>
           {batches.map((b) => (

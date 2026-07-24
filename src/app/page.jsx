@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFeedback } from "@/components/feedback/FeedbackProvider";
 import { useStudentStatus } from "@/components/students/StudentStatusProvider";
+import { usePhase } from "@/components/layout/PhaseProvider";
+import { PhaseSelect } from "@/components/layout/PhaseSelect";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -14,6 +16,7 @@ import {
   directoryMap,
   enrichAttendance,
   scopeAttendance,
+  applyPhase,
   attendanceOverview,
   attendanceByDepartment,
   byDate,
@@ -64,6 +67,7 @@ export default function DashboardPage() {
   const { user } = useAuth();
   const { records } = useFeedback();
   const { isActive, activeOnly, setActiveOnly } = useStudentStatus();
+  const { phase, matches } = usePhase();
 
   const [directory, setDirectory] = useState([]);
   const [attRows, setAttRows] = useState(null);
@@ -160,9 +164,11 @@ export default function DashboardPage() {
 
   const att = useMemo(() => {
     if (!attRows) return [];
-    const scoped = scopeAttendance(user, attRows);
-    return activeOnly ? scoped.filter((r) => isActive(r.torii)) : scoped;
-  }, [attRows, user, activeOnly, isActive]);
+    let scoped = scopeAttendance(user, attRows);
+    if (activeOnly) scoped = scoped.filter((r) => isActive(r.torii));
+    if (phase !== "all") scoped = applyPhase(scoped, matches).filter((r) => r.total > 0);
+    return scoped;
+  }, [attRows, user, activeOnly, isActive, phase, matches]);
   const attOv = useMemo(() => attendanceOverview(att), [att]);
   const attByDept = useMemo(() => attendanceByDepartment(att), [att]);
   const attByBatch = useMemo(() => {
@@ -177,12 +183,15 @@ export default function DashboardPage() {
     return [...m.entries()].map(([k, v]) => [k, v.total ? Math.round((v.present / v.total) * 100) : 0]);
   }, [att]);
 
-  const fb = useMemo(() => scopeFeedback(user, records), [user, records]);
+  const fb = useMemo(
+    () => scopeFeedback(user, records).filter((s) => matches(s.createdAt)),
+    [user, records, matches],
+  );
   const fbOv = useMemo(() => feedbackOverview(fb), [fb]);
 
-  // Assessments (in-scope to the 3 placement batches).
-  const dailyIn = useMemo(() => daily.filter((a) => a.batchList?.some((b) => ALLOWED.has(b))), [daily]);
-  const grandIn = useMemo(() => grand.filter((a) => a.batchList?.some((b) => ALLOWED.has(b))), [grand]);
+  // Assessments (in-scope to the 3 placement batches, filtered to the phase by start date).
+  const dailyIn = useMemo(() => daily.filter((a) => a.batchList?.some((b) => ALLOWED.has(b)) && matches(a.start)), [daily, matches]);
+  const grandIn = useMemo(() => grand.filter((a) => a.batchList?.some((b) => ALLOWED.has(b)) && matches(a.start)), [grand, matches]);
   const asmtAll = useMemo(() => [...dailyIn, ...grandIn], [dailyIn, grandIn]);
   const asmtByBatch = useMemo(() => {
     const m = new Map();
@@ -213,7 +222,8 @@ export default function DashboardPage() {
             {user.department ? ` · ${user.department}` : " · all departments"} — here&apos;s your overview.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <PhaseSelect />
           <div className="flex items-center rounded-full border border-border p-0.5 text-xs">
             <button
               type="button"

@@ -1,9 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useFeedback } from "@/components/feedback/FeedbackProvider";
+import { usePhase } from "@/components/layout/PhaseProvider";
+import { PhaseSelect } from "@/components/layout/PhaseSelect";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -46,6 +48,7 @@ function cellTone(v) {
 export default function FeedbackPage() {
   const { user } = useAuth();
   const { records } = useFeedback();
+  const { phase, matches } = usePhase();
   const router = useRouter();
 
   const [batchF, setBatchF] = useState("all");
@@ -53,7 +56,13 @@ export default function FeedbackPage() {
   const [commentClass, setCommentClass] = useState("all");
   const [downloading, setDownloading] = useState(false);
 
-  const scoped = useMemo(() => scopeFeedback(user, records), [user, records]);
+  const scoped = useMemo(
+    () => scopeFeedback(user, records).filter((s) => matches(s.createdAt)),
+    [user, records, matches],
+  );
+
+  // A selected date can fall outside the chosen phase — reset it when phase changes.
+  useEffect(() => { setDateF("all"); }, [phase]);
 
   const batchOptions = useMemo(() => {
     const m = new Map();
@@ -136,7 +145,7 @@ export default function FeedbackPage() {
 
       {/* Filters */}
       <Card className="flex flex-wrap items-center gap-3 p-4">
-        <span className="text-sm font-medium text-muted">Filter</span>
+        <PhaseSelect />
         <select className={FIELD} value={batchF} onChange={(e) => setBatchF(e.target.value)}>
           <option value="all">All batches</option>
           {batchOptions.map(([slug, name]) => (

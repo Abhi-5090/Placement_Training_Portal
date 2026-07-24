@@ -45,6 +45,23 @@ export function enrichAttendance(result, dirMap) {
   });
 }
 
+/**
+ * Restrict each student's sessions to a training phase and recompute their
+ * present/absent/percent from those sessions. `matches(dateStr)` decides which
+ * dates are in-phase; when it keeps every session the row is returned unchanged.
+ */
+export function applyPhase(rows, matches) {
+  if (!matches) return rows;
+  return rows.map((r) => {
+    const att = (r.attendance || []).filter((a) => matches(a.date));
+    if (att.length === (r.attendance || []).length) return r;
+    const present = att.filter((a) => a.status === "present").length;
+    const absent = att.filter((a) => a.status === "absent").length;
+    const total = present + absent;
+    return { ...r, attendance: att, present, absent, total, percent: total ? Math.round((present / total) * 100) : 0 };
+  });
+}
+
 /** HOD sees only their department's students; everyone else sees all. */
 export function scopeAttendance(user, rows) {
   if (!user) return [];

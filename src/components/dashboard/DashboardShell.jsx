@@ -35,10 +35,14 @@ const Icons = {
   passkey: (
     <path d="M14 2a8 8 0 0 0-7.6 10.5L2 17v5h5v-3h3v-3h2.5A8 8 0 1 0 14 2Zm3 6a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3Z" />
   ),
+  premium: (
+    <path d="M12 2 9.2 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.2-.7L12 2Z" />
+  ),
 };
 
 const NAV = [
   { label: "Dashboard", href: "/", icon: "dashboard" },
+  { label: "Premium Analytics", href: "/premium-analytics", icon: "premium" },
   { label: "Batches", href: "/batches", icon: "batches" },
   { label: "Attendance", href: "/attendance", icon: "attendance" },
   { label: "Assessments", href: "/assessments", icon: "assessments" },

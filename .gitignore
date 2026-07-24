@@ -12,3 +12,6 @@ next-env.d.ts
 
 # Local doc archive (not versioned)
 docs.zip
+
+# Local data exports (contain student PII — never commit)
+*.xlsx

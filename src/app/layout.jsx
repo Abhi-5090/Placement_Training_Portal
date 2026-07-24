@@ -3,6 +3,7 @@ import { ThemeProvider, themeInitScript } from "@/components/layout/ThemeProvide
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { FeedbackProvider } from "@/components/feedback/FeedbackProvider";
 import { StudentStatusProvider } from "@/components/students/StudentStatusProvider";
+import { PhaseProvider } from "@/components/layout/PhaseProvider";
 import { AppShell } from "@/components/layout/AppShell";
 
 const SITE_NAME = "Torii Minds";
@@ -58,7 +59,9 @@ export default function RootLayout({ children }) {
           <AuthProvider>
             <FeedbackProvider>
               <StudentStatusProvider>
-                <AppShell>{children}</AppShell>
+                <PhaseProvider>
+                  <AppShell>{children}</AppShell>
+                </PhaseProvider>
               </StudentStatusProvider>
             </FeedbackProvider>
           </AuthProvider>

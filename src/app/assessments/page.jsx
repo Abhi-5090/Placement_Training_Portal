@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { usePhase } from "@/components/layout/PhaseProvider";
+import { PhaseSelect } from "@/components/layout/PhaseSelect";
 import { Card } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { apiGet, apiPost } from "@/lib/apiClient";
@@ -23,6 +25,7 @@ const catLabel = (c) => (CATEGORIES.find((x) => x[0] === c) || [, ""])[1];
 
 export default function AssessmentsPage() {
   const { user } = useAuth();
+  const { phase, matches } = usePhase();
 
   const [category, setCategory] = useState("aptitude");
   const [aptitude, setAptitude] = useState(null);   // merged daily + grand
@@ -133,10 +136,11 @@ export default function AssessmentsPage() {
 
   const filtered = useMemo(() => {
     return cards
+      .filter((c) => (phase === "all" || !c.start ? true : matches(c.start)))
       .filter((c) => (batchF === "all" ? true : c.batchList?.includes(batchF)))
       .filter((c) => (effDept === "all" ? true : (c.batchList || []).some((b) => { const set = batchDepts.get(b); return set && [...set].some((d) => sameDept(d, effDept)); })))
       .sort((a, b) => parseDateTime(b.start).ts - parseDateTime(a.start).ts);
-  }, [cards, batchF, effDept, batchDepts]);
+  }, [cards, batchF, effDept, batchDepts, phase, matches]);
 
   const countFor = (c) => {
     if (c.kind === "coding") return c.attempted ?? 0; // pre-computed, instant
@@ -164,8 +168,9 @@ export default function AssessmentsPage() {
         <Badge tone="brand">{seesAll ? roleLabel(user.role) : user.department}</Badge>
       </div>
 
-      {/* Category / Department / Batch select bars */}
+      {/* Phase / Category / Department / Batch select bars */}
       <div className="flex flex-wrap items-center gap-3">
+        <PhaseSelect />
         <select className={FIELD} value={category} onChange={(e) => onCategory(e.target.value)} aria-label="Assessment type">
           {CATEGORIES.map(([c, label]) => <option key={c} value={c}>{label}</option>)}
         </select>
@@ -186,7 +191,7 @@ export default function AssessmentsPage() {
 
       {/* Content */}
       {isComm ? (
-        <CommunicationPanel comm={comm} effDept={effDept} batchF={batchF} />
+        <CommunicationPanel comm={comm} effDept={effDept} batchF={batchF} phase={phase} matches={matches} />
       ) : !loaded ? (
         <Card className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-brand" /></Card>
       ) : filtered.length === 0 ? (
@@ -238,13 +243,14 @@ export default function AssessmentsPage() {
   );
 }
 
-function CommunicationPanel({ comm, effDept, batchF }) {
+function CommunicationPanel({ comm, effDept, batchF, phase = "all", matches }) {
   const modules = useMemo(() => {
     const attempts = comm?.attempts || [];
     const m = new Map();
     for (const a of attempts) {
       if (batchF !== "all" && a.batch !== batchF) continue;
       if (effDept !== "all" && !sameDept(a.branch, effDept)) continue;
+      if (phase !== "all" && a.attempted_date && matches && !matches(a.attempted_date)) continue;
       const name = a.collectionName || "—";
       const e = m.get(name) || { name, attempts: 0, students: new Set() };
       e.attempts += 1;
@@ -252,7 +258,7 @@ function CommunicationPanel({ comm, effDept, batchF }) {
       m.set(name, e);
     }
     return [...m.values()].map((x) => ({ name: x.name, attempts: x.attempts, students: x.students.size })).sort((a, b) => b.students - a.students);
-  }, [comm, effDept, batchF]);
+  }, [comm, effDept, batchF, phase, matches]);
 
   if (comm === null) return <Card className="grid place-items-center py-16"><div className="h-8 w-8 animate-spin rounded-full border-2 border-border border-t-brand" /></Card>;
 
