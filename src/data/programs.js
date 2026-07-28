@@ -188,6 +188,27 @@ export const programs = [
     ]),
   },
   {
+    slug: "aire-batch-iii-year",
+    title: "AIRE Batch - III Year",
+    tagline: "III Year · AI Ready Engineer",
+    description:
+      "AI Ready Engineer training for the III-year AIRE cohort — core coding, applied AI, and resume building.",
+    tracks: ["Coding", "AI", "Resume Building"],
+    durationDays: 12,
+    assessments: ASSESSMENTS,
+    timetables: [
+      {
+        batch: "AIRE Batch - III Year",
+        slots: [
+          { time: "9:00 AM – 11:00 AM", activity: "Coding" },
+          { time: "11:00 AM – 1:00 PM", activity: "AI" },
+          { time: "1:00 PM – 2:00 PM", activity: "Lunch" },
+          { time: "2:00 PM – 4:00 PM", activity: "Resume Building" },
+        ],
+      },
+    ],
+  },
+  {
     slug: "placement-training-batch-2",
     title: "Placement Training Batch 2",
     tagline: "4th Year · Batch 2",
