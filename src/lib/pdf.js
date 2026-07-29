@@ -7,7 +7,7 @@ const MUTED = [107, 114, 128];
  * sections: [{ heading?, head: [col…], body: [[cell…]…] }]. jsPDF + autotable
  * are imported lazily so they stay out of the main bundle.
  */
-export async function downloadTablePdf({ title, subtitle, sections, filename = "report.pdf", orientation = "p" }) {
+export async function downloadTablePdf({ title, subtitle, sections, filename = "report.pdf", orientation = "p", headColor = BRAND }) {
   const { jsPDF } = await import("jspdf");
   const autoMod = await import("jspdf-autotable");
   const autoTable = autoMod.default || autoMod.autoTable || autoMod;
@@ -59,7 +59,7 @@ export async function downloadTablePdf({ title, subtitle, sections, filename = "
       margin: { left: margin, right: margin },
       // Content is centre-aligned by default; sections override per column.
       styles: { fontSize: 9, cellPadding: 4, overflow: "linebreak", textColor: INK, lineColor: [229, 231, 235], lineWidth: 0.5, halign: "center", valign: "middle" },
-      headStyles: { fillColor: BRAND, textColor: 255, fontStyle: "bold", halign: "center" },
+      headStyles: { fillColor: headColor, textColor: 255, fontStyle: "bold", halign: "center" },
       alternateRowStyles: { fillColor: [247, 248, 250] },
       columnStyles: s.columnStyles || {},
       theme: "grid",

@@ -38,11 +38,15 @@ const Icons = {
   premium: (
     <path d="M12 2 9.2 8.6 2 9.3l5.5 4.7L5.8 21 12 17.3 18.2 21l-1.7-7 5.5-4.7-7.2-.7L12 2Z" />
   ),
+  reports: (
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6Zm0 2 4 4h-4V4ZM8 13h2v4H8v-4Zm4-2h2v6h-2v-6Zm4 3h-.5V17H16v-1Z" />
+  ),
 };
 
 const NAV = [
   { label: "Dashboard", href: "/", icon: "dashboard" },
   { label: "Premium Analytics", href: "/premium-analytics", icon: "premium" },
+  { label: "Reports", href: "/reports", icon: "reports" },
   { label: "Batches", href: "/batches", icon: "batches" },
   { label: "Attendance", href: "/attendance", icon: "attendance" },
   { label: "Assessments", href: "/assessments", icon: "assessments" },
