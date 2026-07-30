@@ -209,6 +209,26 @@ export const programs = [
     ],
   },
   {
+    slug: "launchpad",
+    title: "Launchpad",
+    tagline: "Launchpad Program",
+    description:
+      "The Launchpad program — core coding paired with skill-development technologies.",
+    tracks: ["Coding", "Skill Development Technologies"],
+    durationDays: 12,
+    assessments: ASSESSMENTS,
+    timetables: [
+      {
+        batch: "Launchpad",
+        slots: [
+          { time: "9:00 AM – 1:00 PM", activity: "Coding" },
+          { time: "1:00 PM – 2:00 PM", activity: "Lunch" },
+          { time: "2:00 PM – 4:00 PM", activity: "Skill Development Technologies" },
+        ],
+      },
+    ],
+  },
+  {
     slug: "placement-training-batch-2",
     title: "Placement Training Batch 2",
     tagline: "4th Year · Batch 2",
