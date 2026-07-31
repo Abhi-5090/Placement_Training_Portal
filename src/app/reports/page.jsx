@@ -224,12 +224,22 @@ export default function ReportsPage() {
       const info = dirByTorii.get(t) || {};
       const att = attDetail(attRow || { attendance: [], present: 0, absent: 0, total: 0, percent: 0 });
 
-      // Every conducted test appears; attempted ones carry the student's score.
+      // Every conducted test appears once; the same daily test is duplicated per
+      // batch in the source, so collapse by kind+title and keep the attempted copy.
       const aScore = apt.scores.get(t);
-      const aptTests = apt.catalog.map((c) => {
+      const aptByTitle = new Map();
+      for (const c of apt.catalog) {
+        const key = `${c.kind}||${c.title}`;
         const sc = aScore?.get(c.id);
-        return { title: c.title, kind: c.kind, questions: c.questions, date: c.date, ts: c.ts, attempted: !!sc, score: sc?.score ?? 0, correct: sc?.correct ?? 0, wrong: sc?.wrong ?? 0, accuracy: sc?.accuracy ?? 0 };
-      });
+        const row = aptByTitle.get(key);
+        if (!row) {
+          aptByTitle.set(key, { title: c.title, kind: c.kind, questions: c.questions, date: c.date, ts: c.ts, attempted: !!sc, score: sc?.score ?? 0, correct: sc?.correct ?? 0, wrong: sc?.wrong ?? 0, accuracy: sc?.accuracy ?? 0 });
+        } else if (sc && (!row.attempted || sc.score > row.score)) {
+          // fill in (or upgrade to) the attempted instance
+          Object.assign(row, { attempted: true, score: sc.score, correct: sc.correct, wrong: sc.wrong, accuracy: sc.accuracy, date: c.date, ts: c.ts });
+        }
+      }
+      const aptTests = [...aptByTitle.values()].sort((a, b) => (a.ts || 0) - (b.ts || 0));
       const cScore = code.scores.get(t);
       const codeAll = code.catalog.map((c) => {
         const sc = cScore?.get(c.id);
